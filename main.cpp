@@ -23,6 +23,10 @@
 #include <GLFW/glfw3.h>			// include GLFW framework header
 
 #include <CSCI441/objects.hpp> // for our 3D objects
+#include "hero_base.hpp"
+#include "hero_1.hpp"
+#include "hero_2.hpp"
+#include "targa.hpp"
 
 // include GLM libraries and matrix functions
 #include <glm/glm.hpp>
@@ -51,10 +55,33 @@ int windowWidth = 640, windowHeight = 480;
 int leftMouseButton;    	 									// status of the mouse button
 glm::vec2 mousePosition;				            // last known X and Y of the mouse
 
-glm::vec3 camPos;            							 	// camera position in cartesian coordinates
-glm::vec3 camAngles;               					// camera DIRECTION in spherical coordinates stored as (theta, phi, radius)
-glm::vec3 camDir; 			                    // camera DIRECTION in cartesian coordinates
+// Camera index to choose between 3 camera modes
+int camIndex = 0;
+// Use to CTRL + drag to zoom
+bool cameraZoom = false;
 
+// Freecam variables
+glm::vec3 freePos;
+glm::vec3 freeDir;
+float freeRadius;
+float freeTheta;
+float freePhi;
+
+// Arcball cam variables
+glm::vec3 arcballPos;
+glm::vec3 arcballDir;
+float arcballRadius;
+float arcballTheta;
+float arcballPhi;
+int arcballHero = 0;
+
+// First person cam variables
+// No angles as it always faces direction character is facing
+glm::vec3 fpPos;
+glm::vec3 fpDir;
+int fpHero = 0;
+
+// Bezier variables
 vector<glm::vec3> controlPoints;
 vector<glm::vec3> coeffs;
 float trackPointVal = 0.0f;
@@ -63,6 +90,12 @@ int numSegments = 0;
 bool moveWanderer = false;
 float wandererU = 0.0;
 float wandererV = 0.0;
+
+// Store heros in vector for easy access when switching cameras
+vector<Hero*> heros;
+Hero_1* hero0 = new Hero_1();
+Hero_2* hero1 = new Hero_2();
+Targa* targa = new Targa();
 
 //*************************************************************************************
 //
@@ -123,12 +156,25 @@ bool loadControlPoints( char* filename ) {
 //
 ////////////////////////////////////////////////////////////////////////////////
 void recomputeOrientation() {
-    camDir.x =  sinf(camAngles.x)*sinf(camAngles.y);
-    camDir.z = -cosf(camAngles.x)*sinf(camAngles.y);
-    camDir.y = -cosf(camAngles.y);
-
-    //and normalize this directional vector!
-    camDir = glm::normalize( camDir );
+	switch(camIndex) {
+		case 0:		// Free cam (1 on keyboard)
+			freeDir.x =  sinf(freeTheta)*sinf(freePhi);
+			freeDir.z = -cosf(freeTheta)*sinf(freePhi);
+			freeDir.y = -cosf(freePhi);
+			//and normalize this directional vector!
+			freeDir = glm::normalize( freeDir );
+			break;
+		case 1:		// Arcball cam on hero (2 on keyboard)
+			arcballDir.x = arcballRadius * sinf(arcballTheta)*sinf(arcballPhi);
+			arcballDir.z = arcballRadius * -cosf(arcballTheta)*sinf(arcballPhi);
+			arcballDir.y = arcballRadius * -cosf(arcballPhi);
+			arcballPos = heros.at(arcballHero)->getPosition() - arcballDir;
+			arcballDir = glm::normalize(arcballDir);
+			break;
+		case 2:		// First person cam on hero (3 on keyboard)
+		
+			break;
+	}
 }
 
 // evaluateBezierCurve() ////////////////////////////////////////////////////////
@@ -222,7 +268,7 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 	//to keep track of how far we want to move at each step. you could make
 	//this change w.r.t. the amount of time the button's held down for
 	//simple scale-sensitive movement!
-	float movementConstant = 0.3f;
+	//float movementConstant = 0.3f;
 
 	if( action == GLFW_PRESS || action == GLFW_REPEAT ) {
 		switch( key ) {
@@ -231,19 +277,40 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 				exit(EXIT_SUCCESS);
 				break;
 			
-			case GLFW_KEY_1:
+			case GLFW_KEY_LEFT_CONTROL:
+			case GLFW_KEY_RIGHT_CONTROL:
+				cameraZoom = true;
+				break;
+				
+			case GLFW_KEY_1:	// free cam
+				camIndex = 0;
+				break;
+			case GLFW_KEY_2:	// arcball cam
+				if (camIndex == 1) {
+					arcballHero += 1;
+					if (arcballHero >= 3) { arcballHero = 0; }
+				}
+				camIndex = 1;
+				arcballTheta = -M_PI / 3.0f;
+				arcballPhi = M_PI / 2.8f;
+				arcballRadius = 15.0f;
+				recomputeOrientation();
+				break;
+			case GLFW_KEY_3:	// first person cam
+				if (camIndex == 2) {
+					fpHero += 1;
+					if (fpHero >= 3) { fpHero = 0; }
+				}
+				camIndex = 2;
+				break;
+			case GLFW_KEY_7:
 				moveWanderer = !moveWanderer;
 				break;
+			
 			//move forward!
 			case GLFW_KEY_W:
 				if (moveWanderer) {
 					wandererU += 0.1;
-				}
-				else {
-					//that's as simple as just moving along the direction.
-					camPos.x += camDir.x*movementConstant;
-					camPos.y += camDir.y*movementConstant;
-					camPos.z += camDir.z*movementConstant;
 				}
 				break;
 			// move left!
@@ -252,15 +319,11 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 					wandererV -= 0.1;
 				}
 				break;
+			
 			//move backwards!
 			case GLFW_KEY_S:
 				if (moveWanderer) {
 					wandererU -= 0.1;
-				} else {
-					//just move BACKWARDS along the direction.
-					camPos.x -= camDir.x*movementConstant;
-					camPos.y -= camDir.y*movementConstant;
-					camPos.z -= camDir.z*movementConstant;
 				}
 				break;
 			
@@ -269,6 +332,16 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 				if (moveWanderer) {
 					wandererV += 0.1;
 				}
+				break;
+			
+		}
+	}
+	
+	if (action == GLFW_RELEASE) {
+		switch(key) {
+			case GLFW_KEY_LEFT_CONTROL:
+			case GLFW_KEY_RIGHT_CONTROL:
+				cameraZoom = false;
 				break;
 		}
 	}
@@ -282,16 +355,36 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 //
 static void cursor_callback( GLFWwindow *window, double x, double y ) {
 	if(leftMouseButton == GLFW_PRESS) {
-		camAngles.x += (x - mousePosition.x)*0.005;
-		camAngles.y += (mousePosition.y - y)*0.005;
-
-		// make sure that phi stays within the range (0, M_PI)
-		if(camAngles.y <= 0)
-				camAngles.y = 0+0.001;
-		if(camAngles.y >= M_PI)
-				camAngles.y = M_PI-0.001;
-
-		recomputeOrientation();     //update camera (x,y,z) based on (theta,phi,radius)
+		switch(camIndex) {
+			case 0:
+				if (cameraZoom) {
+					freePos += (freeDir * 0.1f * (float)((x - mousePosition.x) + (mousePosition.y - y)));
+				}
+				else {
+					freeTheta += (x - mousePosition.x)*0.005;
+					freePhi += (mousePosition.y - y)*0.005;
+					if(freePhi <= 0)
+							freePhi = 0+0.001;
+					if(freePhi >= M_PI)
+							freePhi = M_PI-0.001;
+				}
+				recomputeOrientation();
+				break;
+			case 1:
+				if (cameraZoom) {
+					arcballRadius -= (0.01 * ((x - mousePosition.x) + (mousePosition.y - y)));
+            		if (arcballRadius < 1.0) { arcballRadius = 1.0; }
+            		if (arcballRadius > 25.0) { arcballRadius = 25.0; }
+        		}
+        		else {
+            		arcballTheta += (0.005 * (x - mousePosition.x));
+            		arcballPhi += (0.005 * (mousePosition.y - y));
+            		if (arcballPhi <= 0) { arcballPhi = 0.0001; }
+            		if (arcballPhi >= M_PI / 2) { arcballPhi = (M_PI / 2) - 0.0001; }
+        		}
+				recomputeOrientation();
+				break;
+		}
 	}
 
 	mousePosition.x = x;
@@ -362,6 +455,7 @@ void renderScene(void)  {
 	
 	drawGrid();				// first draw our grid
 
+	/*
 	// TODO #03: Draw our control points
 	glColor3f( 0.0, 1.0, 0.0 );
 	for (unsigned int i = 0; i < controlPoints.size(); i++) {
@@ -388,7 +482,15 @@ void renderScene(void)  {
 	drawWanderer();
 	
 	glLineWidth(1.0f);
+	*/
+	
 	glEnable( GL_LIGHTING );
+	
+	hero0->draw();
+	hero1->draw();
+	targa->draw();
+	targa->animateHero();
+	
 }
 
 //*************************************************************************************
@@ -488,12 +590,27 @@ void setupOpenGL() {
 //
 void setupScene() {
 	// give the camera a scenic starting point.
-	camPos.x = 6;
-	camPos.y = 4;
-	camPos.z = 3;
-	camAngles.x = -M_PI / 3.0f;	// theta
-	camAngles.y = M_PI / 2.8f;	// phi
+	camIndex = 0; // freecam
+	freePos.x = 6;
+	freePos.y = 4;
+	freePos.z = 3;
+	freeTheta = -M_PI / 3.0f;	// theta
+	freePhi = M_PI / 2.8f;	// phi
 	recomputeOrientation();
+
+	// some initial positions and scales to make cubes
+	// for testing cameras
+	// remove later once 3 heros are added
+	heros.push_back(hero0);
+	heros.push_back(hero1);
+	heros.push_back(targa);
+
+	hero0->setPosition(glm::vec3(2,1,2));
+	hero0->setScale(glm::vec3(1,1,1));
+	hero1->setPosition(glm::vec3(2,1,-2));
+	hero1->setScale(glm::vec3(2,1,2));
+	targa->setPosition(glm::vec3(-2,1,2));
+	targa->setScale(glm::vec3(1,1,1));
 }
 
 ///*************************************************************************************
@@ -560,9 +677,24 @@ int main( int argc, char *argv[] ) {
 		glLoadIdentity();							// set the matrix to be the identity
 
 		// set up our look at matrix to position our camera
+		/*
 		glm::mat4 viewMtx = glm::lookAt( camPos,
 								 										 camPos + camDir,
-							 	 									 	 glm::vec3(  0,  1,  0 ) );
+																			glm::vec3(  0,  1,  0 ) );
+		*/
+		
+		glm::mat4 viewMtx;
+		switch(camIndex) {
+			case 0:
+				viewMtx = glm::lookAt(freePos, freePos + freeDir, glm::vec3(0,1,0));
+				break;
+			case 1:
+				viewMtx = glm::lookAt(arcballPos, heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
+				break;
+			case 2:
+				viewMtx = glm::lookAt(fpPos, fpPos + fpDir, glm::vec3(0,1,0));
+				break;
+		}
 		// multiply by the look at matrix - this is the same as our view martix
 		glMultMatrixf( &viewMtx[0][0] );
 
