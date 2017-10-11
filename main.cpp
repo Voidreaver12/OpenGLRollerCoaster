@@ -24,7 +24,7 @@
 
 #include <CSCI441/objects.hpp> // for our 3D objects
 #include "hero_base.hpp"
-#include "hero_1.hpp"
+#include "ire.hpp"
 #include "hero_2.hpp"
 #include "targa.hpp"
 
@@ -93,8 +93,8 @@ float wandererV = 0.0;
 
 // Store heros in vector for easy access when switching cameras
 vector<Hero*> heros;
-Hero_1* hero0 = new Hero_1();
-Hero_2* hero1 = new Hero_2();
+Ire* hero0 = new Ire();
+Hero_2* ire = new Hero_2();
 Targa* targa = new Targa();
 
 //*************************************************************************************
@@ -485,9 +485,10 @@ void renderScene(void)  {
 	*/
 	
 	glEnable( GL_LIGHTING );
-	
+	 
 	hero0->draw();
-	hero1->draw();
+	ire->draw();
+	ire->animateHero();
 	targa->draw();
 	targa->animateHero();
 	
@@ -602,13 +603,13 @@ void setupScene() {
 	// for testing cameras
 	// remove later once 3 heros are added
 	heros.push_back(hero0);
-	heros.push_back(hero1);
+	heros.push_back(ire);
 	heros.push_back(targa);
 
 	hero0->setPosition(glm::vec3(2,1,2));
 	hero0->setScale(glm::vec3(1,1,1));
-	hero1->setPosition(glm::vec3(2,1,-2));
-	hero1->setScale(glm::vec3(2,1,2));
+	ire->setPosition(glm::vec3(2,1,-2));
+	ire->setScale(glm::vec3(2,1,2));
 	targa->setPosition(glm::vec3(-2,1,2));
 	targa->setScale(glm::vec3(1,1,1));
 }
