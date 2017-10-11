@@ -22,11 +22,14 @@ class Hero {
 	
 		// Getters/Setters
 		glm::vec3 getPosition();
+		glm::vec3 getDirection();
 		
+		void setDirection(glm::vec3 d);
 		void rotate(float theta, glm::vec3 dir);
 		void setScale(glm::vec3 s);
 		void setPosition(glm::vec3 p);
 	private:
+		glm::vec3 direction;
 		glm::vec3 position;
 		glm::mat4 rotation;
 		glm::vec3 scale;
@@ -48,6 +51,14 @@ void Hero::draw() {
 
 glm::vec3 Hero::getPosition() {
 	return position;
+}
+
+glm::vec3 Hero::getDirection() {
+	return direction;
+}
+
+void Hero::setDirection(glm::vec3 d) {
+	direction = d;
 }
 
 void Hero::setPosition(glm::vec3 p) {

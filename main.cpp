@@ -222,11 +222,16 @@ void drawCoaster(){
 	if(currentCurvePointArc >= curvePoints.size() - 1) {
 		currentCurvePointArc = 0;
 	}
+	/*
 	glm::mat4 transMtx2 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointParametric));
 	glMultMatrixf( &transMtx2[0][0] );
-	CSCI441::drawSolidSphere( .333, 10, 20 );
+	//CSCI441::drawSolidSphere( .333, 10, 20 );
 	glMultMatrixf( &( glm::inverse( transMtx2 ) )[0][0] );
+	*/
+	targa->setPosition(curvePoints.at(currentCurvePointParametric));
+	
 	currentCurvePointParametric++;
+	
 	
 	if(r % 50 == 0){
 		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
@@ -400,6 +405,10 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 					if (fpHero >= 3) { fpHero = 0; }
 				}
 				camIndex = 2;
+				fpPos = heros.at(fpHero)->getPosition();
+				fpDir = heros.at(fpHero)->getDirection();
+				// move camera forward a bit so it doesnt see the inside of hero
+				fpPos += fpDir;
 				break;
 			case GLFW_KEY_7:
 				moveWanderer = !moveWanderer;
@@ -594,6 +603,8 @@ void renderScene(void)  {
 	glMultMatrixf( &transMtx1[0][0] );
 	drawCoaster();
 	glMultMatrixf( &( glm::inverse( transMtx1 ) )[0][0] );
+	
+	
 }
 
 //*************************************************************************************
@@ -710,10 +721,13 @@ void setupScene() {
 
 	hero0->setPosition(glm::vec3(2,1,2));
 	hero0->setScale(glm::vec3(1,1,1));
+	hero0->setDirection(glm::vec3(0,0,1));
 	ire->setPosition(glm::vec3(2,1,-2));
 	ire->setScale(glm::vec3(2,1,2));
+	ire->setDirection(glm::vec3(0,0,1));
 	targa->setPosition(glm::vec3(-2,1,2));
 	targa->setScale(glm::vec3(1,1,1));
+	targa->setDirection(glm::vec3(0,0,1));
 }
 
 ///*************************************************************************************
@@ -793,7 +807,7 @@ int main( int argc, char *argv[] ) {
 				viewMtx = glm::lookAt(freePos, freePos + freeDir, glm::vec3(0,1,0));
 				break;
 			case 1:
-				viewMtx = glm::lookAt(arcballPos, heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
+				viewMtx = glm::lookAt(heros.at(arcballHero)->getPosition() - (arcballRadius * arcballDir), heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
 				break;
 			case 2:
 				viewMtx = glm::lookAt(fpPos, fpPos + fpDir, glm::vec3(0,1,0));
