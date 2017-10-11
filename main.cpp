@@ -97,6 +97,12 @@ Ire* hero0 = new Ire();
 Hero_2* ire = new Hero_2();
 Targa* targa = new Targa();
 
+int currentCurvePointParametric = 0;
+int currentCurvePointArc = 0;
+
+vector<glm::vec3> curvePoints;
+int r = 0;
+
 //*************************************************************************************
 //
 // Helper Function
@@ -146,6 +152,98 @@ bool loadControlPoints( char* filename ) {
 	}
 
 	return true;
+}
+void loadCurvePoints() {
+	int n = 0;
+	while(n + 3 <= controlPoints.size() - 1){
+		glm::vec3 lineFrom = controlPoints.at(n);
+		glm::vec3 lineTo;
+		for(float t = 0; t < 1; t+=.01) {
+			glm::vec3 a = ((-1.0f * controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1)) - (3.0f*controlPoints.at(n + 2)) + controlPoints.at(n + 3)) * (t * t * t);
+			glm::vec3 b = ((3.0f*controlPoints.at(n)) - (6.0f*controlPoints.at(n + 1)) + (3.0f*controlPoints.at(n + 2))) * (t*t);
+			glm::vec3 c = ((-3.0f*controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1))) * t;
+			glm::vec3 d =  controlPoints.at(n);
+			glm::vec3 lineTo = a + b + c + d;
+			lineFrom = lineTo;
+			curvePoints.push_back(lineTo);
+		}
+		n+=3;
+	}
+}
+
+void drawCoaster(){
+	glm::mat4 transMtx;
+	glDisable( GL_LIGHTING );
+	for(int i = 0; i < controlPoints.size(); i++) {
+		glColor3f(0.000, 0.502, 0.000);
+		transMtx = glm::translate(glm::mat4(), glm::vec3(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z));
+	    glMultMatrixf( &transMtx[0][0] );
+		//CSCI441::drawSolidSphere( .333, 10, 20 );
+		glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
+		
+	}
+	for(int i = 0; i < controlPoints.size() - 1; i++) {
+		glColor3f(1.000, 1.000, 0.000);
+		glLineWidth(5);
+		glBegin(GL_LINES);
+		//glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
+		//glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
+		glEnd();
+		glLineWidth(1);
+		
+	}
+	glEnable( GL_LIGHTING );
+	int n = 0;
+	while(n + 3 <= controlPoints.size() - 1){
+		glm::vec3 lineFrom = controlPoints.at(n);
+		glm::vec3 lineTo;
+		glDisable( GL_LIGHTING );
+		for(float t = 0; t < 1; t+=.01) {
+			glColor3f(0.000, 0.000, 1.000);
+			glLineWidth(5);
+			glm::vec3 a = ((-1.0f * controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1)) - (3.0f*controlPoints.at(n + 2)) + controlPoints.at(n + 3)) * (t * t * t);
+			glm::vec3 b = ((3.0f*controlPoints.at(n)) - (6.0f*controlPoints.at(n + 1)) + (3.0f*controlPoints.at(n + 2))) * (t*t);
+			glm::vec3 c = ((-3.0f*controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1))) * t;
+			glm::vec3 d =  controlPoints.at(n);
+			glm::vec3 lineTo = a + b + c + d;
+			glBegin(GL_LINES);
+			glVertex3f(lineFrom.x,lineFrom.y,lineFrom.z);
+			glVertex3f(lineTo.x,lineTo.y,lineTo.z);
+			glEnd();
+			lineFrom = lineTo;
+			glLineWidth(1);
+		}
+		glEnable( GL_LIGHTING );
+		n+=3;
+	}
+	if(currentCurvePointParametric >= curvePoints.size() - 1) {
+		currentCurvePointParametric = 0;
+	}
+	if(currentCurvePointArc >= curvePoints.size() - 1) {
+		currentCurvePointArc = 0;
+	}
+	glm::mat4 transMtx2 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointParametric));
+	glMultMatrixf( &transMtx2[0][0] );
+	CSCI441::drawSolidSphere( .333, 10, 20 );
+	glMultMatrixf( &( glm::inverse( transMtx2 ) )[0][0] );
+	currentCurvePointParametric++;
+	
+	if(r % 50 == 0){
+		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
+		glMultMatrixf( &transMtx3[0][0] );
+		CSCI441::drawSolidSphere( .333, 10, 20 );
+		glMultMatrixf( &( glm::inverse( transMtx3 ) )[0][0] );
+		currentCurvePointArc+=100;
+	}
+	else {
+		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
+		glMultMatrixf( &transMtx3[0][0] );
+		CSCI441::drawSolidSphere( .333, 10, 20 );
+		glMultMatrixf( &( glm::inverse( transMtx3 ) )[0][0] );
+	}
+	
+	r++;
+		
 }
 
 // recomputeOrientation() //////////////////////////////////////////////////////
@@ -492,6 +590,10 @@ void renderScene(void)  {
 	targa->draw();
 	targa->animateHero();
 	
+	glm::mat4 transMtx1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 0.0f, 0.0f));
+	glMultMatrixf( &transMtx1[0][0] );
+	drawCoaster();
+	glMultMatrixf( &( glm::inverse( transMtx1 ) )[0][0] );
 }
 
 //*************************************************************************************
@@ -652,6 +754,7 @@ int main( int argc, char *argv[] ) {
 	//  This is our draw loop - all rendering is done here.  We use a loop to keep the window open
 	//	until the user decides to close the window and quit the program.  Without a loop, the
 	//	window will display once and then the program exits.
+	loadCurvePoints();
 	while( !glfwWindowShouldClose(window) ) {	// check if the window was instructed to be closed
     glDrawBuffer( GL_BACK );				// work with our back frame buffer
 		glClear( GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT );	// clear the current color contents and depth buffer in the window
