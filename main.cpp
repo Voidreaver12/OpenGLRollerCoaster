@@ -101,6 +101,7 @@ int currentCurvePointParametric = 0;
 int currentCurvePointArc = 0;
 
 vector<glm::vec3> curvePoints;
+vector<glm::vec3> curveDirections;
 int r = 0;
 
 //*************************************************************************************
@@ -153,24 +154,6 @@ bool loadControlPoints( char* filename ) {
 
 	return true;
 }
-void loadCurvePoints() {
-	int n = 0;
-	while(n + 3 <= controlPoints.size() - 1){
-		glm::vec3 lineFrom = controlPoints.at(n);
-		glm::vec3 lineTo;
-		for(float t = 0; t < 1; t+=.01) {
-			glm::vec3 a = ((-1.0f * controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1)) - (3.0f*controlPoints.at(n + 2)) + controlPoints.at(n + 3)) * (t * t * t);
-			glm::vec3 b = ((3.0f*controlPoints.at(n)) - (6.0f*controlPoints.at(n + 1)) + (3.0f*controlPoints.at(n + 2))) * (t*t);
-			glm::vec3 c = ((-3.0f*controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1))) * t;
-			glm::vec3 d =  controlPoints.at(n);
-			glm::vec3 lineTo = a + b + c + d;
-			lineFrom = lineTo;
-			curvePoints.push_back(lineTo);
-		}
-		n+=3;
-	}
-}
-
 
 
 // recomputeOrientation() //////////////////////////////////////////////////////
@@ -231,6 +214,19 @@ glm::vec3 evaluateBezierPatch(vector<glm::vec3> p, float u, float v ) {
 	}
 	
 	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v, false);
+}
+void loadCurvePoints() {
+	int n = 0;
+	while(n + 3 <= controlPoints.size() - 1){
+		glm::vec3 lineTo;
+		for(float t = 0; t < 1; t+=.01) {
+			lineTo = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, false);
+			curvePoints.push_back(lineTo);
+			lineTo = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, true);
+			curveDirections.push_back(lineTo);
+		}
+		n+=3;
+	}
 }
 
 // renderBezierCurve() //////////////////////////////////////////////////////////
@@ -332,6 +328,10 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 					if (fpHero >= 3) { fpHero = 0; }
 				}
 				camIndex = 2;
+				fpPos = heros.at(fpHero)->getPosition();
+				fpDir = heros.at(fpHero)->getDirection();
+				// move camera forward a bit so it doesnt see the inside of hero
+				fpPos += fpDir;
 				break;
 			case GLFW_KEY_7:
 				moveWanderer = !moveWanderer;
@@ -480,6 +480,7 @@ void drawCoaster(){
 	
 	
 	hans->setPosition(curvePoints.at(currentCurvePointParametric));
+	hans->setDirection(curveDirections.at(currentCurvePointParametric));
 	hans->draw();
 	hans->animateHero();
 	currentCurvePointParametric++;
@@ -496,6 +497,7 @@ void drawCoaster(){
 		currentCurvePointArc = 0;
 	}
 	ire->setPosition(curvePoints.at(currentCurvePointArc));
+	ire->rotate(0, curveDirections.at(currentCurvePointArc));
 	ire->draw();
 	ire->animateHero();
 	
@@ -589,6 +591,8 @@ void renderScene(void)  {
 	glMultMatrixf( &transMtx1[0][0] );
 	drawCoaster();
 	glMultMatrixf( &( glm::inverse( transMtx1 ) )[0][0] );
+	
+	
 }
 
 //*************************************************************************************
@@ -705,10 +709,14 @@ void setupScene() {
 
 	hans->setPosition(glm::vec3(0,0,0));
 	hans->setScale(glm::vec3(.1,.1,.1));
+	
 	ire->setPosition(glm::vec3(0,0,0));
 	ire->setScale(glm::vec3(.4,.2,.4));
+	ire->setDirection(glm::vec3(0,0,1));
+
 	targa->setPosition(glm::vec3(-2,1,2));
 	targa->setScale(glm::vec3(1,1,1));
+	targa->setDirection(glm::vec3(0,0,1));
 }
 
 ///*************************************************************************************
@@ -788,7 +796,7 @@ int main( int argc, char *argv[] ) {
 				viewMtx = glm::lookAt(freePos, freePos + freeDir, glm::vec3(0,1,0));
 				break;
 			case 1:
-				viewMtx = glm::lookAt(arcballPos, heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
+				viewMtx = glm::lookAt(heros.at(arcballHero)->getPosition() - (arcballRadius * arcballDir), heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
 				break;
 			case 2:
 				viewMtx = glm::lookAt(fpPos, fpPos + fpDir, glm::vec3(0,1,0));
