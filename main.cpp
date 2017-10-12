@@ -158,7 +158,7 @@ bool loadControlPoints( char* filename ) {
 	}
 	
 	parseCSVFields(file, controlPoints);
-	// parseCSVFields(file, patchPoints);
+	parseCSVFields(file, patchPoints);
 	
 	return true;
 }
