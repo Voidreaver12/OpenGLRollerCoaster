@@ -25,7 +25,7 @@
 #include <CSCI441/objects.hpp> // for our 3D objects
 #include "hero_base.hpp"
 #include "ire.hpp"
-#include "hero_2.hpp"
+#include "hans.hpp"
 #include "targa.hpp"
 
 // include GLM libraries and matrix functions
@@ -93,8 +93,8 @@ float wandererV = 0.0;
 
 // Store heros in vector for easy access when switching cameras
 vector<Hero*> heros;
-Ire* hero0 = new Ire();
-Hero_2* ire = new Hero_2();
+Ire* ire = new Ire();
+Hans* hans = new Hans();
 Targa* targa = new Targa();
 
 int currentCurvePointParametric = 0;
@@ -171,80 +171,7 @@ void loadCurvePoints() {
 	}
 }
 
-void drawCoaster(){
-	glm::mat4 transMtx;
-	glDisable( GL_LIGHTING );
-	for(int i = 0; i < controlPoints.size(); i++) {
-		glColor3f(0.000, 0.502, 0.000);
-		transMtx = glm::translate(glm::mat4(), glm::vec3(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z));
-	    glMultMatrixf( &transMtx[0][0] );
-		//CSCI441::drawSolidSphere( .333, 10, 20 );
-		glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
-		
-	}
-	for(int i = 0; i < controlPoints.size() - 1; i++) {
-		glColor3f(1.000, 1.000, 0.000);
-		glLineWidth(5);
-		glBegin(GL_LINES);
-		//glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
-		//glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
-		glEnd();
-		glLineWidth(1);
-		
-	}
-	glEnable( GL_LIGHTING );
-	int n = 0;
-	while(n + 3 <= controlPoints.size() - 1){
-		glm::vec3 lineFrom = controlPoints.at(n);
-		glm::vec3 lineTo;
-		glDisable( GL_LIGHTING );
-		for(float t = 0; t < 1; t+=.01) {
-			glColor3f(0.000, 0.000, 1.000);
-			glLineWidth(5);
-			glm::vec3 a = ((-1.0f * controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1)) - (3.0f*controlPoints.at(n + 2)) + controlPoints.at(n + 3)) * (t * t * t);
-			glm::vec3 b = ((3.0f*controlPoints.at(n)) - (6.0f*controlPoints.at(n + 1)) + (3.0f*controlPoints.at(n + 2))) * (t*t);
-			glm::vec3 c = ((-3.0f*controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1))) * t;
-			glm::vec3 d =  controlPoints.at(n);
-			glm::vec3 lineTo = a + b + c + d;
-			glBegin(GL_LINES);
-			glVertex3f(lineFrom.x,lineFrom.y,lineFrom.z);
-			glVertex3f(lineTo.x,lineTo.y,lineTo.z);
-			glEnd();
-			lineFrom = lineTo;
-			glLineWidth(1);
-		}
-		glEnable( GL_LIGHTING );
-		n+=3;
-	}
-	if(currentCurvePointParametric >= curvePoints.size() - 1) {
-		currentCurvePointParametric = 0;
-	}
-	if(currentCurvePointArc >= curvePoints.size() - 1) {
-		currentCurvePointArc = 0;
-	}
-	glm::mat4 transMtx2 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointParametric));
-	glMultMatrixf( &transMtx2[0][0] );
-	CSCI441::drawSolidSphere( .333, 10, 20 );
-	glMultMatrixf( &( glm::inverse( transMtx2 ) )[0][0] );
-	currentCurvePointParametric++;
-	
-	if(r % 50 == 0){
-		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
-		glMultMatrixf( &transMtx3[0][0] );
-		CSCI441::drawSolidSphere( .333, 10, 20 );
-		glMultMatrixf( &( glm::inverse( transMtx3 ) )[0][0] );
-		currentCurvePointArc+=100;
-	}
-	else {
-		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
-		glMultMatrixf( &transMtx3[0][0] );
-		CSCI441::drawSolidSphere( .333, 10, 20 );
-		glMultMatrixf( &( glm::inverse( transMtx3 ) )[0][0] );
-	}
-	
-	r++;
-		
-}
+
 
 // recomputeOrientation() //////////////////////////////////////////////////////
 //
@@ -280,14 +207,19 @@ void recomputeOrientation() {
 // Computes a location along a Bezier Curve.
 //
 ////////////////////////////////////////////////////////////////////////////////
-glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t ) {
+glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t, bool derivative) {
 	// TODO #06: Compute a point along a Bezier curve
 	glm::vec3 a = -1.0f * p0 + 3.0f * p1 - 3.0f * p2 + p3;
 	glm::vec3 b = 3.0f * p0 - 6.0f * p1 + 3.0f * p2;
 	glm::vec3 c = -3.0f * p0 + 3.0f * p1;
 	glm::vec3 d = p0;
-	
-	glm::vec3 point = (t * t * t) * a + (t * t) * b + t * c + d;
+	glm::vec3 point;
+	if(derivative){
+		point = (3 * (t * t ) * a) + (2 * (t) * b) + (c);
+	}
+	else {
+		point = (t * t * t) * a + (t * t) * b + t * c + d;
+	}
 	
 	return point;
 }
@@ -295,10 +227,10 @@ glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::ve
 glm::vec3 evaluateBezierPatch(vector<glm::vec3> p, float u, float v ) {
 	vector<glm::vec3> r_p;
 	for (int i = 0; i < 16; i += 4) {
-		r_p.push_back(evaluateBezierCurve(p.at(i), p.at(i+1), p.at(i+2), p.at(i+3), u));
+		r_p.push_back(evaluateBezierCurve(p.at(i), p.at(i+1), p.at(i+2), p.at(i+3), u, false));
 	}
 	
-	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v);
+	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v, false);
 }
 
 // renderBezierCurve() //////////////////////////////////////////////////////////
@@ -315,7 +247,7 @@ void renderBezierCurve(int numPoints) {
 			glBegin(GL_LINE_STRIP); {
 				for (int i = 0; i <= numPoints; i++) {
 					t = i * (float) (1.0 / numPoints);
-					glm::vec3 point = evaluateBezierCurve(controlPoints.at(j), controlPoints.at(j + 1), controlPoints.at(j + 2), controlPoints.at(j + 3), t);
+					glm::vec3 point = evaluateBezierCurve(controlPoints.at(j), controlPoints.at(j + 1), controlPoints.at(j + 2), controlPoints.at(j + 3), t, false);
 					glVertex3f(point.x, point.y, point.z);
 				}
 			}; glEnd();
@@ -505,6 +437,70 @@ static void mouse_button_callback( GLFWwindow *window, int button, int action, i
 //  Function to draw a grid in the XZ-Plane using OpenGL 2D Primitives (GL_LINES)
 //
 ////////////////////////////////////////////////////////////////////////////////
+void drawCoaster(){
+	glm::mat4 transMtx;
+	glDisable( GL_LIGHTING );
+	for(int i = 0; i < controlPoints.size(); i++) {
+		glColor3f(0.000, 0.502, 0.000);
+		transMtx = glm::translate(glm::mat4(), glm::vec3(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z));
+	    glMultMatrixf( &transMtx[0][0] );
+		//CSCI441::drawSolidSphere( .333, 10, 20 );
+		glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
+		
+	}
+	for(int i = 0; i < controlPoints.size() - 1; i++) {
+		glColor3f(1.000, 1.000, 0.000);
+		glLineWidth(5);
+		glBegin(GL_LINES);
+		//glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
+		//glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
+		glEnd();
+		glLineWidth(1);
+		
+	}
+	glEnable( GL_LIGHTING );
+	int n = 0;
+	while(n + 3 <= controlPoints.size() - 1){
+		glm::vec3 lineTo;
+		glDisable( GL_LIGHTING );
+		for(float t = 0; t < 1; t+=.01) {
+			glColor3f(0.000, 0.000, 1.000);
+			glm::vec3 lineTo = evaluateBezierCurve(controlPoints.at(n),controlPoints.at(n + 1),controlPoints.at(n + 2), controlPoints.at(n + 3), t, false);
+			transMtx = glm::translate(glm::mat4(), lineTo);
+			glMultMatrixf( &transMtx[0][0] );
+			CSCI441::drawSolidSphere( .1, 3, 3 );
+			glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
+		}
+		glEnable( GL_LIGHTING );
+		n+=3;
+	}
+	if(currentCurvePointParametric >= curvePoints.size() - 1) {
+		currentCurvePointParametric = 0;
+	}
+	
+	
+	hans->setPosition(curvePoints.at(currentCurvePointParametric));
+	hans->draw();
+	hans->animateHero();
+	currentCurvePointParametric++;
+	
+	int p = 1;
+	while(sqrt(pow(curvePoints.at(currentCurvePointArc).x - curvePoints.at(currentCurvePointArc + p).x, 2) + pow(curvePoints.at(currentCurvePointArc).y - curvePoints.at(currentCurvePointArc + p).y, 2) + pow(curvePoints.at(currentCurvePointArc).z - curvePoints.at(currentCurvePointArc + p).z, 2)) < .2) {
+		p++;
+		if(currentCurvePointArc + p >= curvePoints.size() - 1) {
+			currentCurvePointArc = 0;
+		}
+	}
+	currentCurvePointArc = currentCurvePointArc + p;
+	if(currentCurvePointArc >= curvePoints.size() - 1) {
+		currentCurvePointArc = 0;
+	}
+	ire->setPosition(curvePoints.at(currentCurvePointArc));
+	ire->draw();
+	ire->animateHero();
+	
+		
+}
 void drawGrid() {
     /*
      *	We will get to why we need to do this when we talk about lighting,
@@ -584,11 +580,10 @@ void renderScene(void)  {
 	
 	glEnable( GL_LIGHTING );
 	 
-	hero0->draw();
-	ire->draw();
-	ire->animateHero();
 	targa->draw();
 	targa->animateHero();
+	
+	
 	
 	glm::mat4 transMtx1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 0.0f, 0.0f));
 	glMultMatrixf( &transMtx1[0][0] );
@@ -704,14 +699,14 @@ void setupScene() {
 	// some initial positions and scales to make cubes
 	// for testing cameras
 	// remove later once 3 heros are added
-	heros.push_back(hero0);
+	heros.push_back(hans);
 	heros.push_back(ire);
 	heros.push_back(targa);
 
-	hero0->setPosition(glm::vec3(2,1,2));
-	hero0->setScale(glm::vec3(1,1,1));
-	ire->setPosition(glm::vec3(2,1,-2));
-	ire->setScale(glm::vec3(2,1,2));
+	hans->setPosition(glm::vec3(0,0,0));
+	hans->setScale(glm::vec3(.1,.1,.1));
+	ire->setPosition(glm::vec3(0,0,0));
+	ire->setScale(glm::vec3(.4,.2,.4));
 	targa->setPosition(glm::vec3(-2,1,2));
 	targa->setScale(glm::vec3(1,1,1));
 }
