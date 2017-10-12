@@ -25,7 +25,7 @@
 #include <CSCI441/objects.hpp> // for our 3D objects
 #include "hero_base.hpp"
 #include "ire.hpp"
-#include "hero_2.hpp"
+#include "hans.hpp"
 #include "targa.hpp"
 
 // include GLM libraries and matrix functions
@@ -92,20 +92,22 @@ bool moveWanderer = false;
 float wandererU = 0.0;
 float wandererV = 0.0;
 float wandererTheta = 0;
-glm::vec3 wandererPos;
-float wandererStepSize = 0.05;
-float wandererTurnMag = 0.15;
+float wandererStepSize = 0.01;
+float wandererTurnMag = 0.05;
+float wandererMoveSign = 0.0;
+float wandererTurnSign = 0.0;
 
 // Store heros in vector for easy access when switching cameras
 vector<Hero*> heros;
-Ire* hero0 = new Ire();
-Hero_2* ire = new Hero_2();
+Ire* ire = new Ire();
+Hans* hans = new Hans();
 Targa* targa = new Targa();
 
 int currentCurvePointParametric = 0;
 int currentCurvePointArc = 0;
 
 vector<glm::vec3> curvePoints;
+vector<glm::vec3> curveDirections;
 int r = 0;
 
 //*************************************************************************************
@@ -163,98 +165,6 @@ bool loadControlPoints( char* filename ) {
 	return true;
 }
 
-void loadCurvePoints() {
-	int n = 0;
-	while(n + 3 <= controlPoints.size() - 1){
-		glm::vec3 lineFrom = controlPoints.at(n);
-		glm::vec3 lineTo;
-		for(float t = 0; t < 1; t+=.01) {
-			glm::vec3 a = ((-1.0f * controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1)) - (3.0f*controlPoints.at(n + 2)) + controlPoints.at(n + 3)) * (t * t * t);
-			glm::vec3 b = ((3.0f*controlPoints.at(n)) - (6.0f*controlPoints.at(n + 1)) + (3.0f*controlPoints.at(n + 2))) * (t*t);
-			glm::vec3 c = ((-3.0f*controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1))) * t;
-			glm::vec3 d =  controlPoints.at(n);
-			glm::vec3 lineTo = a + b + c + d;
-			lineFrom = lineTo;
-			curvePoints.push_back(lineTo);
-		}
-		n+=3;
-	}
-}
-
-void drawCoaster(){
-	glm::mat4 transMtx;
-	glDisable( GL_LIGHTING );
-	for(int i = 0; i < controlPoints.size(); i++) {
-		glColor3f(0.000, 0.502, 0.000);
-		transMtx = glm::translate(glm::mat4(), glm::vec3(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z));
-	    glMultMatrixf( &transMtx[0][0] );
-		//CSCI441::drawSolidSphere( .333, 10, 20 );
-		glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
-		
-	}
-	for(int i = 0; i < controlPoints.size() - 1; i++) {
-		glColor3f(1.000, 1.000, 0.000);
-		glLineWidth(5);
-		glBegin(GL_LINES);
-		//glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
-		//glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
-		glEnd();
-		glLineWidth(1);
-		
-	}
-	glEnable( GL_LIGHTING );
-	int n = 0;
-	while(n + 3 <= controlPoints.size() - 1){
-		glm::vec3 lineFrom = controlPoints.at(n);
-		glm::vec3 lineTo;
-		glDisable( GL_LIGHTING );
-		for(float t = 0; t < 1; t+=.01) {
-			glColor3f(0.000, 0.000, 1.000);
-			glLineWidth(5);
-			glm::vec3 a = ((-1.0f * controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1)) - (3.0f*controlPoints.at(n + 2)) + controlPoints.at(n + 3)) * (t * t * t);
-			glm::vec3 b = ((3.0f*controlPoints.at(n)) - (6.0f*controlPoints.at(n + 1)) + (3.0f*controlPoints.at(n + 2))) * (t*t);
-			glm::vec3 c = ((-3.0f*controlPoints.at(n)) + (3.0f*controlPoints.at(n + 1))) * t;
-			glm::vec3 d =  controlPoints.at(n);
-			glm::vec3 lineTo = a + b + c + d;
-			glBegin(GL_LINES);
-			glVertex3f(lineFrom.x,lineFrom.y,lineFrom.z);
-			glVertex3f(lineTo.x,lineTo.y,lineTo.z);
-			glEnd();
-			lineFrom = lineTo;
-			glLineWidth(1);
-		}
-		glEnable( GL_LIGHTING );
-		n+=3;
-	}
-	if(currentCurvePointParametric >= curvePoints.size() - 1) {
-		currentCurvePointParametric = 0;
-	}
-	if(currentCurvePointArc >= curvePoints.size() - 1) {
-		currentCurvePointArc = 0;
-	}
-	glm::mat4 transMtx2 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointParametric));
-	glMultMatrixf( &transMtx2[0][0] );
-	CSCI441::drawSolidSphere( .333, 10, 20 );
-	glMultMatrixf( &( glm::inverse( transMtx2 ) )[0][0] );
-	currentCurvePointParametric++;
-	
-	if(r % 50 == 0){
-		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
-		glMultMatrixf( &transMtx3[0][0] );
-		CSCI441::drawSolidSphere( .333, 10, 20 );
-		glMultMatrixf( &( glm::inverse( transMtx3 ) )[0][0] );
-		currentCurvePointArc+=100;
-	}
-	else {
-		glm::mat4 transMtx3 = glm::translate(glm::mat4(), curvePoints.at(currentCurvePointArc));
-		glMultMatrixf( &transMtx3[0][0] );
-		CSCI441::drawSolidSphere( .333, 10, 20 );
-		glMultMatrixf( &( glm::inverse( transMtx3 ) )[0][0] );
-	}
-	
-	r++;
-		
-}
 
 // recomputeOrientation() //////////////////////////////////////////////////////
 //
@@ -290,14 +200,19 @@ void recomputeOrientation() {
 // Computes a location along a Bezier Curve.
 //
 ////////////////////////////////////////////////////////////////////////////////
-glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t ) {
+glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::vec3 p3, float t, bool derivative) {
 	// TODO #06: Compute a point along a Bezier curve
 	glm::vec3 a = -1.0f * p0 + 3.0f * p1 - 3.0f * p2 + p3;
 	glm::vec3 b = 3.0f * p0 - 6.0f * p1 + 3.0f * p2;
 	glm::vec3 c = -3.0f * p0 + 3.0f * p1;
 	glm::vec3 d = p0;
-	
-	glm::vec3 point = (t * t * t) * a + (t * t) * b + t * c + d;
+	glm::vec3 point;
+	if(derivative){
+		point = (3 * (t * t ) * a) + (2 * (t) * b) + (c);
+	}
+	else {
+		point = (t * t * t) * a + (t * t) * b + t * c + d;
+	}
 	
 	return point;
 }
@@ -306,10 +221,24 @@ glm::vec3 evaluateBezierPatch(vector<glm::vec3> points, float u, float v ) {
 	vector<glm::vec3> p = points;
 	vector<glm::vec3> r_p;
 	for (int i = 0; i < 16; i += 4) {
-		r_p.push_back(evaluateBezierCurve(p.at(i), p.at(i+1), p.at(i+2), p.at(i+3), u));
+		r_p.push_back(evaluateBezierCurve(p.at(i), p.at(i+1), p.at(i+2), p.at(i+3), u, false));
 	}
 	
-	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v);
+	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v, false);
+}
+
+void loadCurvePoints() {
+	int n = 0;
+	while(n + 3 <= controlPoints.size() - 1){
+		glm::vec3 lineTo;
+		for(float t = 0; t < 1; t+=.01) {
+			lineTo = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, false);
+			curvePoints.push_back(lineTo);
+			lineTo = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, true);
+			curveDirections.push_back(lineTo);
+		}
+		n+=3;
+	}
 }
 
 // renderBezierCurve() //////////////////////////////////////////////////////////
@@ -326,7 +255,7 @@ void renderBezierCurve(vector<glm::vec3> points, int numPoints) {
 			glBegin(GL_LINE_STRIP); {
 				for (int i = 0; i <= numPoints; i++) {
 					t = i * (float) (1.0 / numPoints);
-					glm::vec3 point = evaluateBezierCurve(points.at(j), points.at(j + 1), points.at(j + 2), points.at(j + 3), t);
+					glm::vec3 point = evaluateBezierCurve(points.at(j), points.at(j + 1), points.at(j + 2), points.at(j + 3), t, true);
 					glVertex3f(point.x, point.y, point.z);
 				}
 			}; glEnd();
@@ -414,6 +343,10 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 					if (fpHero >= 3) { fpHero = 0; }
 				}
 				camIndex = 2;
+				fpPos = heros.at(fpHero)->getPosition();
+				fpDir = heros.at(fpHero)->getDirection();
+				// move camera forward a bit so it doesnt see the inside of hero
+				fpPos += fpDir;
 				break;
 			case GLFW_KEY_7:
 				moveWanderer = !moveWanderer;
@@ -422,31 +355,29 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 			//move forward!
 			case GLFW_KEY_W:
 				if (moveWanderer) {
-					wandererU -= wandererStepSize * sin(wandererTheta);
-					wandererV -= wandererStepSize * cos(wandererTheta);
+					wandererMoveSign = -1.0;
 				}
 				break;
 			// move left!
 			case GLFW_KEY_A:
 				if (moveWanderer) {
-					wandererTheta += wandererTurnMag;
+					wandererTurnSign = 1.0;
 				}
 				break;
 			
 			//move backwards!
 			case GLFW_KEY_S:
 				if (moveWanderer) {
-					wandererU += wandererStepSize * sin(wandererTheta);
-					wandererV += wandererStepSize * cos(wandererTheta);
+					wandererMoveSign = 1.0;
 				}
 				break;
 			
 			// move right!
 			case GLFW_KEY_D:
 				if (moveWanderer) {
-					wandererTheta -= wandererTurnMag;
+					wandererTurnSign = -1.0;
 				}
-				break;
+				break; 
 			
 		}
 	}
@@ -456,13 +387,16 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 			case GLFW_KEY_RIGHT_CONTROL:
 				cameraZoom = false;
 				break;
+			case GLFW_KEY_W:
+			case GLFW_KEY_S:
+				wandererMoveSign = 0.0;
+				break;
+			case GLFW_KEY_A:
+			case GLFW_KEY_D:
+				wandererTurnSign = 0.0;
+				break;
 		}
 	}
-	
-	if (wandererU > 1) wandererU = 1;
-	else if (wandererU < 0) wandererU = 0;
-	if (wandererV > 1) wandererV = 1;
-	else if (wandererV < 0) wandererV = 0;
 }
 
 //
@@ -525,6 +459,72 @@ static void mouse_button_callback( GLFWwindow *window, int button, int action, i
 //  Function to draw a grid in the XZ-Plane using OpenGL 2D Primitives (GL_LINES)
 //
 ////////////////////////////////////////////////////////////////////////////////
+void drawCoaster(){
+	glm::mat4 transMtx;
+	glDisable( GL_LIGHTING );
+	for(int i = 0; i < controlPoints.size(); i++) {
+		glColor3f(0.000, 0.502, 0.000);
+		transMtx = glm::translate(glm::mat4(), glm::vec3(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z));
+	    glMultMatrixf( &transMtx[0][0] );
+		//CSCI441::drawSolidSphere( .333, 10, 20 );
+		glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
+		
+	}
+	for(int i = 0; i < controlPoints.size() - 1; i++) {
+		glColor3f(1.000, 1.000, 0.000);
+		glLineWidth(5);
+		glBegin(GL_LINES);
+		//glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
+		//glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
+		glEnd();
+		glLineWidth(1);
+		
+	}
+	glEnable( GL_LIGHTING );
+	int n = 0;
+	while(n + 3 <= controlPoints.size() - 1){
+		glm::vec3 lineTo;
+		glDisable( GL_LIGHTING );
+		for(float t = 0; t < 1; t+=.01) {
+			glColor3f(0.000, 0.000, 1.000);
+			glm::vec3 lineTo = evaluateBezierCurve(controlPoints.at(n),controlPoints.at(n + 1),controlPoints.at(n + 2), controlPoints.at(n + 3), t, false);
+			transMtx = glm::translate(glm::mat4(), lineTo);
+			glMultMatrixf( &transMtx[0][0] );
+			CSCI441::drawSolidSphere( .1, 3, 3 );
+			glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
+		}
+		glEnable( GL_LIGHTING );
+		n+=3;
+	}
+	if(currentCurvePointParametric >= curvePoints.size() - 1) {
+		currentCurvePointParametric = 0;
+	}
+	
+	
+	hans->setPosition(curvePoints.at(currentCurvePointParametric));
+	hans->setDirection(curveDirections.at(currentCurvePointParametric));
+	hans->draw();
+	hans->animateHero();
+	currentCurvePointParametric++;
+	
+	int p = 1;
+	while(sqrt(pow(curvePoints.at(currentCurvePointArc).x - curvePoints.at(currentCurvePointArc + p).x, 2) + pow(curvePoints.at(currentCurvePointArc).y - curvePoints.at(currentCurvePointArc + p).y, 2) + pow(curvePoints.at(currentCurvePointArc).z - curvePoints.at(currentCurvePointArc + p).z, 2)) < .2) {
+		p++;
+		if(currentCurvePointArc + p >= curvePoints.size() - 1) {
+			currentCurvePointArc = 0;
+		}
+	}
+	currentCurvePointArc = currentCurvePointArc + p;
+	if(currentCurvePointArc >= curvePoints.size() - 1) {
+		currentCurvePointArc = 0;
+	}
+	ire->setPosition(curvePoints.at(currentCurvePointArc));
+	ire->rotate(0, curveDirections.at(currentCurvePointArc));
+	ire->draw();
+	ire->animateHero();
+	
+		
+}
 void drawGrid() {
     /*
      *	We will get to why we need to do this when we talk about lighting,
@@ -554,6 +554,19 @@ void drawGrid() {
     glEnable( GL_LIGHTING );
 }
 
+void performWandererMovement() {
+	wandererTheta += wandererTurnSign * wandererTurnMag;
+	wandererU += wandererMoveSign * wandererStepSize * sin(wandererTheta);
+	wandererV += wandererMoveSign * wandererStepSize * cos(wandererTheta);
+	
+	if (wandererMoveSign != 0 || wandererTurnSign != 0) targa->animateHero();
+	
+	if (wandererU > 1) wandererU = 1;
+	else if (wandererU < 0) wandererU = 0;
+	if (wandererV > 1) wandererV = 1;
+	else if (wandererV < 0) wandererV = 0;
+}
+
 void drawWandererWorld() {
 	renderBezierPatch(5); // then draw the bezier patch
 	glm::vec3 wandererPos = evaluateBezierPatch(patchPoints, wandererU, wandererV);
@@ -561,7 +574,6 @@ void drawWandererWorld() {
 	targa->setPosition(wandererPos);
 	targa->rotate((wandererTheta - M_PI / 2) * (3.1415f/180.0f), glm::vec3(0.0, 1.0, 0.0));
 	targa->draw();
-	targa->animateHero();
 }
 
 // renderScene() ///////////////////////////////////////////////////////////////
@@ -577,18 +589,15 @@ void renderScene(void)  {
 	
 	glEnable( GL_LIGHTING );
 	 
-	hero0->draw();
-	ire->draw();
 	ire->animateHero();
 	drawWandererWorld();
-	// targa->draw();
-	// targa->animateHero();
-	
 	
 	glm::mat4 transMtx1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 0.0f, 0.0f));
 	glMultMatrixf( &transMtx1[0][0] );
 	drawCoaster();
 	glMultMatrixf( &( glm::inverse( transMtx1 ) )[0][0] );
+	
+	
 }
 
 //*************************************************************************************
@@ -699,17 +708,20 @@ void setupScene() {
 	// some initial positions and scales to make cubes
 	// for testing cameras
 	// remove later once 3 heros are added
-	heros.push_back(hero0);
+	heros.push_back(hans);
 	heros.push_back(ire);
 	heros.push_back(targa);
 
-	hero0->setPosition(glm::vec3(2,1,2));
-	hero0->setScale(glm::vec3(1,1,1));
-	ire->setPosition(glm::vec3(2,1,-2));
-	ire->setScale(glm::vec3(2,1,2));
+	hans->setPosition(glm::vec3(0,0,0));
+	hans->setScale(glm::vec3(.1,.1,.1));
+	
+	ire->setPosition(glm::vec3(0,0,0));
+	ire->setScale(glm::vec3(.4,.2,.4));
+	ire->setDirection(glm::vec3(0,0,1));
+
 	targa->setPosition(glm::vec3(-2,1,2));
 	targa->setScale(glm::vec3(1,1,1));
-	wandererPos = targa->getPosition();
+	targa->setDirection(glm::vec3(0,0,1));
 }
 
 ///*************************************************************************************
@@ -789,7 +801,7 @@ int main( int argc, char *argv[] ) {
 				viewMtx = glm::lookAt(freePos, freePos + freeDir, glm::vec3(0,1,0));
 				break;
 			case 1:
-				viewMtx = glm::lookAt(arcballPos, heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
+				viewMtx = glm::lookAt(heros.at(arcballHero)->getPosition() - (arcballRadius * arcballDir), heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
 				break;
 			case 2:
 				viewMtx = glm::lookAt(fpPos, fpPos + fpDir, glm::vec3(0,1,0));
@@ -799,6 +811,7 @@ int main( int argc, char *argv[] ) {
 		glMultMatrixf( &viewMtx[0][0] );
 
 		renderScene();					// draw everything to the window
+		performWandererMovement();
 
 		glfwSwapBuffers(window);// flush the OpenGL commands and make sure they get rendered!
 		glfwPollEvents();				// check for any events and signal to redraw screen
