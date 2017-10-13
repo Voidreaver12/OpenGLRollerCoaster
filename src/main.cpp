@@ -10,7 +10,7 @@
  *      Contains the base code for 3D Bezier Curve visualizer.
  *
  */
-
+ 
 // HEADERS ///////////////////////////////////////////////////////////////////// 
 
 // include the OpenGL library header
@@ -88,9 +88,9 @@ vector<glm::vec3> patchPoints;
 vector<glm::vec3> coeffs;
 float trackPointVal = 0.0f;
 int numSegments = 0;
-
 int wandererPatchPointCount = 5;
 
+// wanderer variables
 bool moveWanderer = false;
 float wandererU = 0.0;
 float wandererV = 0.0;
@@ -131,6 +131,7 @@ vector<string> split(const std::string &s, char delim) {
 	return fields;
 }
 
+// used to parse a CSV field with an initial line count
 void parseCSVFields(ifstream &file, vector<glm::vec3> &points) {
 	int num_points;
 	file >> num_points;
@@ -149,6 +150,7 @@ void parseCSVFields(ifstream &file, vector<glm::vec3> &points) {
 	}
 }
 
+// draw a mushroom!
 void drawMushroom(float height) {
 	glColor3f(0.8, 0.8, 0.5);
 	CSCI441::drawSolidCylinder( height / 4, height / 4, height, 1, 15);
@@ -159,6 +161,7 @@ void drawMushroom(float height) {
 	glMultMatrixf( &(glm::inverse( transMtx ))[0][0] );
 }
 
+// draw a tree
 void drawTree(float height) {
 	glColor3f(0.5, 0.3, 0.1);
 	CSCI441::drawSolidCylinder( height / 8, height / 8, height, 1, 15);
@@ -169,6 +172,7 @@ void drawTree(float height) {
 	glMultMatrixf( &(glm::inverse( transMtx ))[0][0] );
 }
 
+// parse the bottom section of the file and populate objects
 void parseObjects(ifstream &file) {
 	int numTrees;
 	int numMushrooms;
@@ -270,6 +274,7 @@ glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::ve
 	return point;
 }
 
+// return the location on a bezier patch
 glm::vec3 evaluateBezierPatch(vector<glm::vec3> points, float u, float v ) {
 	vector<glm::vec3> p = points;
 	vector<glm::vec3> r_p;
@@ -280,6 +285,7 @@ glm::vec3 evaluateBezierPatch(vector<glm::vec3> points, float u, float v ) {
 	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v, false);
 }
 
+// return the normal on a bezier patch
 glm::vec3 evaluateBezierPatchNormal(vector<glm::vec3> points, float u, float v, int numPoints) {
 	glm::vec3 point1 = evaluateBezierPatch(patchPoints, u, v);
 	glm::vec3 point2 = evaluateBezierPatch(patchPoints, u + (1.0 / numPoints), v);				
@@ -326,6 +332,7 @@ void renderBezierCurve(vector<glm::vec3> points, int numPoints) {
 	}
 }
 
+// draw the bezier patch!
 void renderBezierPatch(int numPoints) {
 	glDisable(GL_LIGHTING);
 
@@ -595,6 +602,7 @@ void drawCoaster(){
 		
 }
 
+// move the wanderer!
 void performWandererMovement() {
 	wandererTheta += wandererTurnSign * wandererTurnMag;
 	wandererU += wandererMoveSign * wandererStepSize * sin(wandererTheta);
@@ -609,7 +617,7 @@ void performWandererMovement() {
 	else if (wandererV < 0) wandererV = 0;
 }
 
- 
+// draw the wanderer's tromping grounds!
 void drawWandererWorld() {
 	renderBezierPatch(wandererPatchPointCount); // then draw the bezier patch
 	glm::vec3 wandererPos = evaluateBezierPatch(patchPoints, wandererU, wandererV);
