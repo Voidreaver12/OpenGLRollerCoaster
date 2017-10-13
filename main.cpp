@@ -11,7 +11,7 @@
  *
  */
 
-// HEADERS /////////////////////////////////////////////////////////////////////
+// HEADERS ///////////////////////////////////////////////////////////////////// 
 
 // include the OpenGL library header
 #ifdef __APPLE__				// if compiling on Mac OS
@@ -87,6 +87,8 @@ vector<glm::vec3> patchPoints;
 vector<glm::vec3> coeffs;
 float trackPointVal = 0.0f;
 int numSegments = 0;
+
+int wandererPatchPointCount = 5;
 
 bool moveWanderer = false;
 float wandererU = 0.0;
@@ -225,6 +227,14 @@ glm::vec3 evaluateBezierPatch(vector<glm::vec3> points, float u, float v ) {
 	}
 	
 	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v, false);
+}
+
+glm::vec3 evaluateBezierPatchNormal(vector<glm::vec3> points, float u, float v, int numPoints) {
+	glm::vec3 point1 = evaluateBezierPatch(patchPoints, u, v);
+	glm::vec3 point2 = evaluateBezierPatch(patchPoints, u + (1.0 / numPoints), v);				
+	glm::vec3 point4 = evaluateBezierPatch(patchPoints, u, v + (1.0 / numPoints));
+	glm::vec3 point3 = evaluateBezierPatch(patchPoints, u + (1.0 / numPoints), v + (1.0 / numPoints));
+	return glm::cross(point2 - point1, point3 - point1);
 }
 
 void loadCurvePoints() {
@@ -558,6 +568,7 @@ void performWandererMovement() {
 	wandererTheta += wandererTurnSign * wandererTurnMag;
 	wandererU += wandererMoveSign * wandererStepSize * sin(wandererTheta);
 	wandererV += wandererMoveSign * wandererStepSize * cos(wandererTheta);
+	targa->setDirection(glm::vec3(sin(wandererTheta - M_PI / 2), 0.0, cos(wandererTheta - M_PI / 2)));
 	
 	if (wandererMoveSign != 0 || wandererTurnSign != 0) targa->animateHero();
 	
@@ -568,7 +579,7 @@ void performWandererMovement() {
 }
 
 void drawWandererWorld() {
-	renderBezierPatch(5); // then draw the bezier patch
+	renderBezierPatch(wandererPatchPointCount); // then draw the bezier patch
 	glm::vec3 wandererPos = evaluateBezierPatch(patchPoints, wandererU, wandererV);
 	wandererPos.y += 1;
 	targa->setPosition(wandererPos);
@@ -810,6 +821,9 @@ int main( int argc, char *argv[] ) {
 		// multiply by the look at matrix - this is the same as our view martix
 		glMultMatrixf( &viewMtx[0][0] );
 
+		fpPos = heros.at(fpHero)->getPosition();
+		fpDir = heros.at(fpHero)->getDirection();
+		fpPos += fpDir;
 		renderScene();					// draw everything to the window
 		performWandererMovement();
 
