@@ -84,6 +84,7 @@ int fpHero = 0;
 
 // Bezier variables
 vector<glm::vec3> controlPoints;
+vector<glm::vec3> patchPoints;
 vector<glm::vec3> coeffs;
 float trackPointVal = 0.0f;
 int numSegments = 0;
@@ -91,6 +92,11 @@ int numSegments = 0;
 bool moveWanderer = false;
 float wandererU = 0.0;
 float wandererV = 0.0;
+float wandererTheta = 0;
+float wandererStepSize = 0.01;
+float wandererTurnMag = 0.05;
+float wandererMoveSign = 0.0;
+float wandererTurnSign = 0.0;
 
 // Store heros in vector for easy access when switching cameras
 vector<Hero*> heros;
@@ -121,24 +127,9 @@ vector<string> split(const std::string &s, char delim) {
 	return fields;
 }
 
-// loadControlPoints() /////////////////////////////////////////////////////////
-//
-//  Load our control points from file and store them in
-//	the global variable controlPoints
-//
-////////////////////////////////////////////////////////////////////////////////
-bool loadControlPoints( char* filename ) {
-	// TODO #02: read in control points from file.  Make sure the file can be
-	// opened and handle it appropriately.
-	ifstream file ( filename );
+void parseCSVFields(ifstream &file, vector<glm::vec3> &points) {
 	int num_points;
-	if (file.good()) {
-		file >> num_points;
-	}
-	else {
-		printf ("Invalid CSV file");
-		exit(1);
-	}
+	file >> num_points;
 	for (int i = 0; i < num_points; i++) {
 		string line;
 		file >> line;
@@ -149,10 +140,29 @@ bool loadControlPoints( char* filename ) {
 		x = atoi(fields.at(0).c_str());
 		y = atoi(fields.at(1).c_str());
 		z = atoi(fields.at(2).c_str());
-		controlPoints.push_back(glm::vec3(x,y,z));
+		points.push_back(glm::vec3(x,y,z));
 		printf("%f %f %f\n", x, y, z);
 	}
+}
 
+// loadControlPoints() /////////////////////////////////////////////////////////
+//
+//  Load our control points from file and store them in
+//	the global variable controlPoints
+//
+////////////////////////////////////////////////////////////////////////////////
+bool loadControlPoints( char* filename ) {
+	// TODO #02: read in control points from file.  Make sure the file can be
+	// opened and handle it appropriately.
+	ifstream file ( filename );
+	if (!file.good()) {
+		printf ("Invalid CSV file");
+		exit(1);
+	}
+	
+	parseCSVFields(file, controlPoints);
+	parseCSVFields(file, patchPoints);
+	
 	return true;
 }
 
@@ -208,7 +218,8 @@ glm::vec3 evaluateBezierCurve( glm::vec3 p0, glm::vec3 p1, glm::vec3 p2, glm::ve
 	return point;
 }
 
-glm::vec3 evaluateBezierPatch(vector<glm::vec3> p, float u, float v ) {
+glm::vec3 evaluateBezierPatch(vector<glm::vec3> points, float u, float v ) {
+	vector<glm::vec3> p = points;
 	vector<glm::vec3> r_p;
 	for (int i = 0; i < 16; i += 4) {
 		r_p.push_back(evaluateBezierCurve(p.at(i), p.at(i+1), p.at(i+2), p.at(i+3), u, false));
@@ -216,6 +227,7 @@ glm::vec3 evaluateBezierPatch(vector<glm::vec3> p, float u, float v ) {
 	
 	return evaluateBezierCurve(r_p.at(0), r_p.at(1), r_p.at(2), r_p.at(3), v, false);
 }
+
 void loadCurvePoints() {
 	int n = 0;
 	while(n + 3 <= controlPoints.size() - 1){
@@ -236,15 +248,15 @@ void loadCurvePoints() {
 //  Breaks the curve into n segments as specified by the resolution.
 //
 ////////////////////////////////////////////////////////////////////////////////
-void renderBezierCurve(int numPoints) {
+void renderBezierCurve(vector<glm::vec3> points, int numPoints) {
     float t = 0.0;
 	glColor3f( 0.0, 0.0, 1.0 );
-	for (unsigned int j = 0; j < controlPoints.size() - 1; j++) {
+	for (unsigned int j = 0; j < points.size() - 1; j++) {
 		if ((j % 3) == 0) {
 			glBegin(GL_LINE_STRIP); {
 				for (int i = 0; i <= numPoints; i++) {
 					t = i * (float) (1.0 / numPoints);
-					glm::vec3 point = evaluateBezierCurve(controlPoints.at(j), controlPoints.at(j + 1), controlPoints.at(j + 2), controlPoints.at(j + 3), t, false);
+					glm::vec3 point = evaluateBezierCurve(points.at(j), points.at(j + 1), points.at(j + 2), points.at(j + 3), t, true);
 					glVertex3f(point.x, point.y, point.z);
 				}
 			}; glEnd();
@@ -253,22 +265,25 @@ void renderBezierCurve(int numPoints) {
 }
 
 void renderBezierPatch(int numPoints) {
-	glColor3f(0.0, 0.0, 1.0 );
+	
+	glEnable(GL_LIGHTING);
+	GLfloat matColorD[4] = { 0.0, 0.0, 0.0, 1.0 }; 
+	glMaterialfv( GL_FRONT_AND_BACK, GL_DIFFUSE, matColorD);
 
-	glBegin(GL_QUADS); {
+	glBegin(GL_TRIANGLE_STRIP); {
 		for (int u = 0; u < numPoints ; u++) {
 			for (int v = 0; v < numPoints; v++) {
-				glm::vec3 point1 = evaluateBezierPatch(controlPoints, (float) u / numPoints, (float) v / numPoints);
+				glm::vec3 point1 = evaluateBezierPatch(patchPoints, (float) u / numPoints, (float) v / numPoints);
+				glm::vec3 point2 = evaluateBezierPatch(patchPoints, (float) (u + 1) / numPoints, (float) v / numPoints);				
+				glm::vec3 point4 = evaluateBezierPatch(patchPoints, (float) u / numPoints, (float) (v + 1) / numPoints);
+				glm::vec3 point3 = evaluateBezierPatch(patchPoints, (float) (u + 1) / numPoints, (float) (v + 1) / numPoints);
+				glm::vec3 normal = glm::cross(point2 - point1, point3 - point1); 
+				
+				glNormal3f(normal.x, normal.y, normal.z);
 				glVertex3f(point1.x, point1.y, point1.z);
-				
-				glm::vec3 point2 = evaluateBezierPatch(controlPoints, (float) (u + 1) / numPoints, (float) v / numPoints);
 				glVertex3f(point2.x, point2.y, point2.z);
-				
-				glm::vec3 point3 = evaluateBezierPatch(controlPoints, (float) (u + 1) / numPoints, (float) (v + 1) / numPoints);
-				glVertex3f(point3.x, point3.y, point3.z);
-				
-				glm::vec3 point4 = evaluateBezierPatch(controlPoints, (float) u / numPoints, (float) (v + 1) / numPoints);
 				glVertex3f(point4.x, point4.y, point4.z);
+				glVertex3f(point3.x, point3.y, point3.z);
 			}
 		}
 	}; glEnd();
@@ -341,38 +356,45 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 			//move forward!
 			case GLFW_KEY_W:
 				if (moveWanderer) {
-					wandererU += 0.1;
+					wandererMoveSign = -1.0;
 				}
 				break;
 			// move left!
 			case GLFW_KEY_A:
 				if (moveWanderer) {
-					wandererV -= 0.1;
+					wandererTurnSign = 1.0;
 				}
 				break;
 			
 			//move backwards!
 			case GLFW_KEY_S:
 				if (moveWanderer) {
-					wandererU -= 0.1;
+					wandererMoveSign = 1.0;
 				}
 				break;
 			
 			// move right!
 			case GLFW_KEY_D:
 				if (moveWanderer) {
-					wandererV += 0.1;
+					wandererTurnSign = -1.0;
 				}
-				break;
+				break; 
 			
 		}
 	}
-	
-	if (action == GLFW_RELEASE) {
-		switch(key) {
+	else if ( action == GLFW_RELEASE ) {
+		switch ( key ) {
 			case GLFW_KEY_LEFT_CONTROL:
 			case GLFW_KEY_RIGHT_CONTROL:
 				cameraZoom = false;
+				break;
+			case GLFW_KEY_W:
+			case GLFW_KEY_S:
+				wandererMoveSign = 0.0;
+				break;
+			case GLFW_KEY_A:
+			case GLFW_KEY_D:
+				wandererTurnSign = 0.0;
 				break;
 		}
 	}
@@ -534,12 +556,26 @@ void drawGrid() {
     glEnable( GL_LIGHTING );
 }
 
-void drawWanderer() {
-	glColor3f( 1.0, 0.0, 0.0 );
-	glm::mat4 transMtx = glm::translate(glm::mat4(), evaluateBezierPatch(controlPoints, wandererU, wandererV));
-	glMultMatrixf(&transMtx[0][0]);
-	CSCI441::drawSolidCube(1);
-	glMultMatrixf(&(glm::inverse(transMtx))[0][0]);
+void performWandererMovement() {
+	wandererTheta += wandererTurnSign * wandererTurnMag;
+	wandererU += wandererMoveSign * wandererStepSize * sin(wandererTheta);
+	wandererV += wandererMoveSign * wandererStepSize * cos(wandererTheta);
+	
+	if (wandererMoveSign != 0 || wandererTurnSign != 0) targa->animateHero();
+	
+	if (wandererU > 1) wandererU = 1;
+	else if (wandererU < 0) wandererU = 0;
+	if (wandererV > 1) wandererV = 1;
+	else if (wandererV < 0) wandererV = 0;
+}
+
+void drawWandererWorld() {
+	renderBezierPatch(5); // then draw the bezier patch
+	glm::vec3 wandererPos = evaluateBezierPatch(patchPoints, wandererU, wandererV);
+	wandererPos.y += 1;
+	targa->setPosition(wandererPos);
+	targa->rotate((wandererTheta - M_PI / 2) * (3.1415f/180.0f), glm::vec3(0.0, 1.0, 0.0));
+	targa->draw();
 }
 
 // renderScene() ///////////////////////////////////////////////////////////////
@@ -552,42 +588,11 @@ void drawWanderer() {
 void renderScene(void)  {
 	
 	drawGrid();				// first draw our grid
-
-	/*
-	// TODO #03: Draw our control points
-	glColor3f( 0.0, 1.0, 0.0 );
-	for (unsigned int i = 0; i < controlPoints.size(); i++) {
-		glColor3f( 0.0, 1.0 - (float) i / controlPoints.size(), 0.0 );
-		glm::mat4 transMtx = glm::translate(glm::mat4(), controlPoints.at(i));
-		glMultMatrixf(&transMtx[0][0]);
-		CSCI441::drawSolidSphere( 0.5, 10, 10);
-		glMultMatrixf(&(glm::inverse(transMtx))[0][0]);
-	}
-
-	// TODO #04: Connect our control points
-	glColor3f( 1.0, 1.0, 0.0 );
-	glLineWidth(3.0f);
-	glDisable( GL_LIGHTING );
-	glBegin(GL_LINE_STRIP); {
-		for (unsigned int i = 0; i < controlPoints.size(); i++) {
-			glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
-		}
-	}; glEnd();
-
-	// TODO #05: Draw the Bezier Curve!
-	renderBezierPatch(5);
-	
-	drawWanderer();
-	
-	glLineWidth(1.0f);
-	*/
 	
 	glEnable( GL_LIGHTING );
 	 
-	targa->draw();
-	targa->animateHero();
-	
-	
+	ire->animateHero();
+	drawWandererWorld();
 	
 	glm::mat4 transMtx1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 0.0f, 0.0f));
 	glMultMatrixf( &transMtx1[0][0] );
@@ -808,6 +813,7 @@ int main( int argc, char *argv[] ) {
 		glMultMatrixf( &viewMtx[0][0] );
 
 		renderScene();					// draw everything to the window
+		performWandererMovement();
 
 		glfwSwapBuffers(window);// flush the OpenGL commands and make sure they get rendered!
 		glfwPollEvents();				// check for any events and signal to redraw screen
