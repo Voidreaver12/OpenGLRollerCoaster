@@ -94,7 +94,7 @@ int wandererPatchPointCount = 5;
 bool moveWanderer = false;
 float wandererU = 0.0;
 float wandererV = 0.0;
-float wandererTheta = 0;
+float wandererTheta = M_PI;
 float wandererStepSize = 0.01;
 float wandererTurnMag = 0.05;
 float wandererMoveSign = 0.0;
@@ -105,6 +105,8 @@ vector<Hero*> heros;
 Ire* ire = new Ire();
 Hans* hans = new Hans();
 Targa* targa = new Targa();
+
+GLuint environmentDL; 
 
 int currentCurvePointParametric = 1;
 int currentCurvePointArc = 1;
@@ -147,13 +149,60 @@ void parseCSVFields(ifstream &file, vector<glm::vec3> &points) {
 	}
 }
 
-// loadControlPoints() /////////////////////////////////////////////////////////
+void drawMushroom(float height) {
+	glColor3f(0.8, 0.8, 0.5);
+	CSCI441::drawSolidCylinder( height / 4, height / 4, height, 1, 15);
+	glm::mat4 transMtx = glm::translate( glm::mat4(), glm::vec3(0.0, height / 3, 0.0));
+	glMultMatrixf( &transMtx[0][0] );
+	glColor3f(0.8, 0.0, 0.0);
+	CSCI441::drawSolidCone( height, height, 1, 15);
+	glMultMatrixf( &(glm::inverse( transMtx ))[0][0] );
+}
+
+void drawTree(float height) {
+	glColor3f(0.5, 0.3, 0.1);
+	CSCI441::drawSolidCylinder( height / 8, height / 8, height, 1, 15);
+	glm::mat4 transMtx = glm::translate( glm::mat4(), glm::vec3(0.0, height / 1.5, 0.0));
+	glMultMatrixf( &transMtx[0][0] );
+	glColor3f(0.1, 0.8, 0.0);
+	CSCI441::drawSolidSphere( height / 2, 5, 5);
+	glMultMatrixf( &(glm::inverse( transMtx ))[0][0] );
+}
+
+void parseObjects(ifstream &file) {
+	int numTrees;
+	int numMushrooms;
+	file >> numTrees;
+	file >> numMushrooms;
+	
+	float size;
+	float x,y,z;
+	environmentDL = glGenLists(1);
+	glNewList(environmentDL, GL_COMPILE);
+	for (int i = 0; i < numTrees; i++) {
+		file >> size >> x >> y >> z;
+		glm::mat4 transMtx = glm::translate( glm::mat4(), glm::vec3(x, y, z));
+		glMultMatrixf( &transMtx[0][0] );
+		drawTree(size);
+		glMultMatrixf( &(glm::inverse( transMtx ))[0][0] );
+	}
+	for (int i = 0; i < numMushrooms; i++) {
+		file >> size >> x >> y >> z;
+		glm::mat4 transMtx = glm::translate( glm::mat4(), glm::vec3(x, y, z));
+		glMultMatrixf( &transMtx[0][0] );
+		drawMushroom(size);
+		glMultMatrixf( &(glm::inverse( transMtx ))[0][0] );
+	}
+	glEndList();
+}
+
+// loadSetupFile() /////////////////////////////////////////////////////////
 //
 //  Load our control points from file and store them in
 //	the global variable controlPoints
 //
 ////////////////////////////////////////////////////////////////////////////////
-bool loadControlPoints( char* filename ) {
+bool loadSetupFile( char* filename ) {
 	// TODO #02: read in control points from file.  Make sure the file can be
 	// opened and handle it appropriately.
 	ifstream file ( filename );
@@ -164,6 +213,7 @@ bool loadControlPoints( char* filename ) {
 	
 	parseCSVFields(file, controlPoints);
 	parseCSVFields(file, patchPoints);
+	parseObjects(file);
 	
 	return true;
 }
@@ -241,12 +291,14 @@ glm::vec3 evaluateBezierPatchNormal(vector<glm::vec3> points, float u, float v, 
 void loadCurvePoints() {
 	int n = 0;
 	while(n + 3 <= controlPoints.size() - 1){
-		glm::vec3 lineTo;
-		for(float t = 0; t < 1; t+=.01) {
-			lineTo = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, false);
-			curvePoints.push_back(lineTo);
-			lineTo = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, true);
-			curveDirections.push_back(lineTo);
+		glm::vec3 currentPoint;
+		glm::vec3 tangent;
+		float stepSize = 0.01;
+		for(float t = 0; t < 1; t += stepSize) {
+			currentPoint = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t, false);
+			curvePoints.push_back(currentPoint);
+			tangent = evaluateBezierCurve(controlPoints.at(n), controlPoints.at(n + 1), controlPoints.at(n + 2),controlPoints.at(n + 3), t + stepSize, false) - currentPoint;
+			curveDirections.push_back(tangent);
 		}
 		n+=3;
 	}
@@ -275,11 +327,9 @@ void renderBezierCurve(vector<glm::vec3> points, int numPoints) {
 }
 
 void renderBezierPatch(int numPoints) {
-	
-	glEnable(GL_LIGHTING);
-	GLfloat matColorD[4] = { 0.0, 0.0, 0.0, 1.0 }; 
-	glMaterialfv( GL_FRONT_AND_BACK, GL_DIFFUSE, matColorD);
+	glDisable(GL_LIGHTING);
 
+	glColor3f( 0.0, 0.25, 1.0 );
 	glBegin(GL_TRIANGLE_STRIP); {
 		for (int u = 0; u < numPoints ; u++) {
 			for (int v = 0; v < numPoints; v++) {
@@ -297,6 +347,8 @@ void renderBezierPatch(int numPoints) {
 			}
 		}
 	}; glEnd();
+	
+	glEnable(GL_LIGHTING);
 }
 
 //*************************************************************************************
@@ -359,7 +411,7 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 				// move camera forward a bit so it doesnt see the inside of hero
 				fpPos += fpDir;
 				break;
-			case GLFW_KEY_7:
+			case GLFW_KEY_4:
 				moveWanderer = !moveWanderer;
 				break;
 			
@@ -474,10 +526,10 @@ void drawCoaster(){
 	glm::mat4 transMtx;
 	glDisable( GL_LIGHTING );
 	for(int i = 0; i < controlPoints.size(); i++) {
-		glColor3f(0.000, 0.502, 0.000);
+		glColor3f(0, 0.5, 0.000);
 		transMtx = glm::translate(glm::mat4(), glm::vec3(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z));
 	    glMultMatrixf( &transMtx[0][0] );
-		//CSCI441::drawSolidSphere( .333, 10, 20 );
+		// CSCI441::drawSolidSphere( .333, 10, 20 );
 		glMultMatrixf( &( glm::inverse( transMtx ) )[0][0] );
 		
 	}
@@ -485,8 +537,8 @@ void drawCoaster(){
 		glColor3f(1.000, 1.000, 0.000);
 		glLineWidth(5);
 		glBegin(GL_LINES);
-		//glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
-		//glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
+		// glVertex3f(controlPoints.at(i).x, controlPoints.at(i).y, controlPoints.at(i).z);
+		// glVertex3f(controlPoints.at(i + 1).x, controlPoints.at(i + 1).y, controlPoints.at(i + 1).z);
 		glEnd();
 		glLineWidth(1);
 		
@@ -497,7 +549,7 @@ void drawCoaster(){
 		glm::vec3 lineTo;
 		glDisable( GL_LIGHTING );
 		for(float t = 0; t < 1; t+=.01) {
-			glColor3f(0.000, 0.000, 1.000);
+			glColor3f(0.5, 0.5, 0.5);
 			glm::vec3 lineTo = evaluateBezierCurve(controlPoints.at(n),controlPoints.at(n + 1),controlPoints.at(n + 2), controlPoints.at(n + 3), t, false);
 			transMtx = glm::translate(glm::mat4(), lineTo);
 			glMultMatrixf( &transMtx[0][0] );
@@ -513,7 +565,9 @@ void drawCoaster(){
 	
 	
 	ire->setPosition(curvePoints.at(currentCurvePointParametric));
-	ire->rotate(-(acos((dot(curveDirections.at(currentCurvePointParametric), curveDirections.at(currentCurvePointParametric - 1)))/(length(curveDirections.at(currentCurvePointParametric))*length(curveDirections.at(currentCurvePointParametric - 1))))), cross(curveDirections.at(currentCurvePointParametric), curveDirections.at(currentCurvePointParametric - 1)));
+	glm::vec3 tangent = curveDirections.at(currentCurvePointParametric);
+	float rotationAngle = acos(dot(tangent, glm::vec3(-1.0, 0.0, 0.0))/(length(tangent)*length(glm::vec3(-1.0, 0.0, 0.0))));
+	ire->rotate(rotationAngle, cross(glm::vec3(-1.0, 0.0, 0.0), tangent));
 	ire->setDirection(curveDirections.at(currentCurvePointParametric));
 	ire->draw();
 	ire->animateHero();
@@ -531,39 +585,14 @@ void drawCoaster(){
 		currentCurvePointArc = p;
 	}
 	hans->setPosition(curvePoints.at(currentCurvePointArc));
+	tangent = curveDirections.at(currentCurvePointArc);
+	rotationAngle = acos(dot(tangent, glm::vec3(-1.0, 0.0, 0.0))/(length(tangent)*length(glm::vec3(-1.0, 0.0, 0.0))));
+	hans->rotate(rotationAngle, cross(glm::vec3(-1.0, 0.0, 0.0), tangent));
 	hans->setDirection(curveDirections.at(currentCurvePointArc));
 	hans->draw();
 	hans->animateHero();
 	
 		
-}
-void drawGrid() {
-    /*
-     *	We will get to why we need to do this when we talk about lighting,
-     *	but for now whenever we want to draw something with an OpenGL
-     *	Primitive - like a line, quad, point - we need to disable lighting
-     *	and then reenable it for use with the GLUT 3D Primitives.
-     */
-    glDisable( GL_LIGHTING );
-
-    // draw our grid....what? triple nested for loops!  crazy!  but it works :)
-    glColor3f( 1, 1, 1 );
-    for( int dir = 0; dir < 2; dir++ ) {
-        for( int i = -5; i < 6; i++ ) {
-            glBegin( GL_LINE_STRIP ); {
-                for( int j = -5; j < 6; j++ )
-                    glVertex3f( dir < 1 ? i : j,
-																0,
-																dir < 1 ? j : i );
-            }; glEnd();
-        }
-    }
-
-    /*
-     *	As noted above, we are done drawing with OpenGL Primitives, so we
-     *	must turn lighting back on.
-     */
-    glEnable( GL_LIGHTING );
 }
 
 void performWandererMovement() {
@@ -580,13 +609,15 @@ void performWandererMovement() {
 	else if (wandererV < 0) wandererV = 0;
 }
 
+ 
 void drawWandererWorld() {
 	renderBezierPatch(wandererPatchPointCount); // then draw the bezier patch
 	glm::vec3 wandererPos = evaluateBezierPatch(patchPoints, wandererU, wandererV);
 	wandererPos.y += 1;
 	targa->setPosition(wandererPos);
-	targa->rotate((wandererTheta - M_PI / 2) * (3.1415f/180.0f), glm::vec3(0.0, 1.0, 0.0));
+	targa->rotate((wandererTheta - M_PI / 2), glm::vec3(0.0, 1.0, 0.0));
 	targa->draw();
+	glCallList(environmentDL);
 }
 
 // renderScene() ///////////////////////////////////////////////////////////////
@@ -596,19 +627,16 @@ void drawWandererWorld() {
 //      front buffer (what the user sees).
 //
 ////////////////////////////////////////////////////////////////////////////////
-void renderScene(void)  {
-	
-	drawGrid();				// first draw our grid
-	
+void renderScene(void)  {	
 	glEnable( GL_LIGHTING );
 	 
 	ire->animateHero();
 	drawWandererWorld();
 	
-	glm::mat4 transMtx1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 0.0f, 0.0f));
-	glMultMatrixf( &transMtx1[0][0] );
+	// glm::mat4 transMtx1 = glm::translate(glm::mat4(), glm::vec3(-4.0f, 0.0f, 0.0f));
+	// glMultMatrixf( &transMtx1[0][0] );
 	drawCoaster();
-	glMultMatrixf( &( glm::inverse( transMtx1 ) )[0][0] );
+	// glMultMatrixf( &( glm::inverse( transMtx1 ) )[0][0] );
 	
 	
 }
@@ -707,8 +735,9 @@ void setupOpenGL() {
 //
 //	setup everything specific to our scene.  in this case,
 //	position our camera
-//
-void setupScene() {
+// 
+void setupScene(char* csv_file_location) {
+	loadSetupFile(csv_file_location);
 	// give the camera a scenic starting point.
 	camIndex = 0; // freecam
 	freePos.x = 6;
@@ -726,7 +755,7 @@ void setupScene() {
 	heros.push_back(targa);
 
 	hans->setPosition(glm::vec3(0,0,0));
-	hans->setScale(glm::vec3(.1,.1,.1));
+	hans->setScale(glm::vec3(.25,.25,.25));
 	
 	ire->setPosition(glm::vec3(0,0,0));
 	ire->setScale(glm::vec3(.4,.2,.4));
@@ -756,13 +785,11 @@ int main( int argc, char *argv[] ) {
 	else {
 		csv_file_location = argv[1];
 	}
-	
-	loadControlPoints(csv_file_location);
 
 	// GLFW sets up our OpenGL context so must be done first
 	GLFWwindow *window = setupGLFW();	// initialize all of the GLFW specific information releated to OpenGL and our window
 	setupOpenGL();										// initialize all of the OpenGL specific information
-	setupScene();											// initialize objects in our scene
+	setupScene(csv_file_location);											// initialize objects in our scene
 
 	fprintf(stdout, "[INFO]: /--------------------------------------------------------\\\n");
 	fprintf(stdout, "[INFO]: | OpenGL Information                                     |\n");
@@ -823,8 +850,10 @@ int main( int argc, char *argv[] ) {
 		// multiply by the look at matrix - this is the same as our view martix
 		glMultMatrixf( &viewMtx[0][0] );
 
+		float cameraOffset = 0.5;
 		fpPos = heros.at(fpHero)->getPosition();
 		fpDir = heros.at(fpHero)->getDirection();
+		fpPos.y += cameraOffset;
 		fpPos += fpDir;
 		renderScene();					// draw everything to the window
 		performWandererMovement();

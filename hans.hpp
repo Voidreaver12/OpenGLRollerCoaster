@@ -35,11 +35,14 @@ class Hans : public Hero {
 		
 };
 void Hans::drawHero() {
+	glm::mat4 rotateMtx = glm::rotate(glm::mat4(), 3.14159f / 2, glm::vec3(0.0f, 0.0f, 1.0f));
+	glMultMatrixf( &rotateMtx[0][0] );
 	drawMover();
+	glMultMatrixf( &(glm::inverse( rotateMtx ))[0][0] );
 }
 
 void Hans::animateHero() {
-	if(n % 10 == 0) {
+	if(n % 5 == 0) {
 		double temp = insideRocketColor_0;
 		insideRocketColor_0 = outsideRocketColor_0;
 		outsideRocketColor_0 = temp;

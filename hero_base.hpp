@@ -70,6 +70,6 @@ void Hero::setScale(glm::vec3 s) {
 }
 
 void Hero::rotate(float theta, glm::vec3 dir) {
-	rotation = glm::rotate(glm::mat4(), (180.0f/3.1415f) * theta, dir);
+	rotation = glm::rotate(glm::mat4(), theta, dir);
 }
 #endif // __HERO_BASE_HPP__
