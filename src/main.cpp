@@ -81,6 +81,7 @@ int arcballHero = 0;
 glm::vec3 fpPos;
 glm::vec3 fpDir;
 int fpHero = 0;
+bool showFP = false;
 
 // Bezier variables
 vector<glm::vec3> controlPoints;
@@ -408,11 +409,16 @@ static void keyboard_callback( GLFWwindow *window, int key, int scancode, int ac
 				recomputeOrientation();
 				break;
 			case GLFW_KEY_3:	// first person cam
-				if (camIndex == 2) {
-					fpHero += 1;
-					if (fpHero >= 3) { fpHero = 0; }
+				if (!showFP) {
+					showFP = true;
 				}
-				camIndex = 2;
+				else if (showFP) {
+					fpHero += 1;
+					if (fpHero >= 3) {
+						fpHero = 0;
+						showFP = false; 
+					}
+				}
 				fpPos = heros.at(fpHero)->getPosition();
 				fpDir = heros.at(fpHero)->getDirection();
 				// move camera forward a bit so it doesnt see the inside of hero
@@ -851,9 +857,6 @@ int main( int argc, char *argv[] ) {
 			case 1:
 				viewMtx = glm::lookAt(heros.at(arcballHero)->getPosition() - (arcballRadius * arcballDir), heros.at(arcballHero)->getPosition(), glm::vec3(0,1,0));
 				break;
-			case 2:
-				viewMtx = glm::lookAt(fpPos, fpPos + fpDir, glm::vec3(0,1,0));
-				break;
 		}
 		// multiply by the look at matrix - this is the same as our view martix
 		glMultMatrixf( &viewMtx[0][0] );
@@ -866,6 +869,20 @@ int main( int argc, char *argv[] ) {
 		renderScene();					// draw everything to the window
 		performWandererMovement();
 
+		if (showFP) {
+			glEnable(GL_SCISSOR_TEST);
+			glScissor(0, 0, framebufferWidth / 2, framebufferHeight / 2);
+			glClear(GL_DEPTH_BUFFER_BIT);
+			glClear(GL_COLOR_BUFFER_BIT);
+			glDisable(GL_SCISSOR_TEST);
+			glViewport(0, 0, framebufferWidth / 2, framebufferHeight / 2);
+			glMatrixMode(GL_MODELVIEW);
+			glLoadIdentity();
+			viewMtx = glm::lookAt(fpPos, fpPos + fpDir, glm::vec3(0,1,0));
+			glMultMatrixf( &viewMtx[0][0]);
+			renderScene();
+
+		}
 		glfwSwapBuffers(window);// flush the OpenGL commands and make sure they get rendered!
 		glfwPollEvents();				// check for any events and signal to redraw screen
 
