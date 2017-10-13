@@ -1,4 +1,4 @@
-Adrien Perinet
+﻿Adrien Perinet
 Ian Tobiason
 Noah Deibert
 
@@ -22,7 +22,9 @@ Keys/Usage
 		S (backwards)
   Q/Esc Exit
   
-Compilation: just type make!
+Compilation: just type make!  
+Run with ./RCT.exe <file> where the file can either be
+"splashland.csv" or "loopofdeath.csv"
 
 File Format:
 <number of control points for roller coaster track track>
