@@ -39,6 +39,7 @@
 
 #include <fstream>			// for file I/O
 #include <sstream>
+#include <iostream>
 #include <vector>				// for vector
 #include <string>     // std::string, std::stoi
 using namespace std;
@@ -97,8 +98,8 @@ Ire* ire = new Ire();
 Hans* hans = new Hans();
 Targa* targa = new Targa();
 
-int currentCurvePointParametric = 0;
-int currentCurvePointArc = 0;
+int currentCurvePointParametric = 1;
+int currentCurvePointArc = 1;
 
 vector<glm::vec3> curvePoints;
 vector<glm::vec3> curveDirections;
@@ -475,31 +476,32 @@ void drawCoaster(){
 		n+=3;
 	}
 	if(currentCurvePointParametric >= curvePoints.size() - 1) {
-		currentCurvePointParametric = 0;
+		currentCurvePointParametric = 1;
 	}
 	
 	
-	hans->setPosition(curvePoints.at(currentCurvePointParametric));
-	hans->setDirection(curveDirections.at(currentCurvePointParametric));
-	hans->draw();
-	hans->animateHero();
+	ire->setPosition(curvePoints.at(currentCurvePointParametric));
+	ire->rotate(-(acos((dot(curveDirections.at(currentCurvePointParametric), curveDirections.at(currentCurvePointParametric - 1)))/(length(curveDirections.at(currentCurvePointParametric))*length(curveDirections.at(currentCurvePointParametric - 1))))), cross(curveDirections.at(currentCurvePointParametric), curveDirections.at(currentCurvePointParametric - 1)));
+	ire->setDirection(curveDirections.at(currentCurvePointParametric));
+	ire->draw();
+	ire->animateHero();
 	currentCurvePointParametric++;
 	
 	int p = 1;
 	while(sqrt(pow(curvePoints.at(currentCurvePointArc).x - curvePoints.at(currentCurvePointArc + p).x, 2) + pow(curvePoints.at(currentCurvePointArc).y - curvePoints.at(currentCurvePointArc + p).y, 2) + pow(curvePoints.at(currentCurvePointArc).z - curvePoints.at(currentCurvePointArc + p).z, 2)) < .2) {
 		p++;
 		if(currentCurvePointArc + p >= curvePoints.size() - 1) {
-			currentCurvePointArc = 0;
+			currentCurvePointArc = p;
 		}
 	}
 	currentCurvePointArc = currentCurvePointArc + p;
 	if(currentCurvePointArc >= curvePoints.size() - 1) {
-		currentCurvePointArc = 0;
+		currentCurvePointArc = p;
 	}
-	ire->setPosition(curvePoints.at(currentCurvePointArc));
-	ire->rotate(0, curveDirections.at(currentCurvePointArc));
-	ire->draw();
-	ire->animateHero();
+	hans->setPosition(curvePoints.at(currentCurvePointArc));
+	hans->setDirection(curveDirections.at(currentCurvePointArc));
+	hans->draw();
+	hans->animateHero();
 	
 		
 }
